@@ -1,0 +1,161 @@
+
+buildscript {
+    ext.GRADLE_VERSION = "5.5.1"
+    ext.ALLURE_LIBS_VERSION = "2.12.1"
+    ext.ALLURE_PLUGIN_VERSION = "2.8.1"
+    ext.CONFIG_PROPERTY_NAME = "solution"
+    ext.TEST_ENVIRONMENT_FLAG = "TEST_PROFILE"
+
+    
+    repositories { jcenter() }
+    dependencies { classpath "io.qameta.allure:allure-gradle:${ALLURE_PLUGIN_VERSION}" }
+}
+
+apply plugin: 'io.qameta.allure'
+
+allure {
+    version = ALLURE_LIBS_VERSION
+    aspectjweaver = true
+    autoconfigure = true
+    useJUnit5 {
+        version = ALLURE_LIBS_VERSION
+    }
+}
+
+apply plugin: 'java-library'
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven'
+
+defaultTasks 'check', 'test', 'install'
+
+group = 'com.domain.webproject' // todo: actualize 'domain.webproject'
+description = 'ProjectName Web testing'
+version = '1.0'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+wrapper {
+    gradleVersion = GRADLE_VERSION
+}
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+configurations {
+    agent
+}
+
+dependencies {
+    agent "org.aspectj:aspectjweaver:1.9.4"
+    // https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.9.9'
+    // https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.9.9.2'
+
+    // https://mvnrepository.com/artifact/commons-lang/commons-lang
+    compile group: 'commons-lang', name: 'commons-lang', version: '2.6'
+    // https://mvnrepository.com/artifact/org.javers/javers-core
+    compile group: 'org.javers', name: 'javers-core', version: '5.6.1'
+
+    // WEB
+    compile group: 'com.codeborne', name: 'selenide', version: '5.2.6'
+
+    // JUNIT
+    // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-api
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.5.1'
+    // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-engine
+    testRuntime group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.5.1'
+    // https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter-params
+    testCompile group: 'org.junit.jupiter', name: 'junit-jupiter-params', version: '5.5.1'
+    // https://mvnrepository.com/artifact/org.junit.vintage/junit-vintage-engine
+//    testCompile group: 'org.junit.vintage', name: 'junit-vintage-engine', version: '5.5.1'
+    // https://mvnrepository.com/artifact/org.junit.platform/junit-platform-launcher
+    testRuntime group: 'org.junit.platform', name: 'junit-platform-launcher', version: '1.5.1'
+    // https://mvnrepository.com/artifact/org.junit.platform/junit-platform-runner
+    testCompile group: 'org.junit.platform', name: 'junit-platform-runner', version: '1.5.1'
+
+    // Reporting
+    // https://mvnrepository.com/artifact/io.qameta.allure/allure-junit5
+    compile group: 'io.qameta.allure', name: 'allure-junit5', version: ALLURE_LIBS_VERSION
+    // https://mvnrepository.com/artifact/io.qameta.allure/allure-gradle
+    compile group: 'io.qameta.allure', name: 'allure-gradle', version: ALLURE_PLUGIN_VERSION
+    // https://mvnrepository.com/artifact/io.qameta.allure/allure-commandline
+    compile group: 'io.qameta.allure', name: 'allure-commandline', version: ALLURE_LIBS_VERSION
+    compile group: 'io.qameta.allure', name: 'allure-selenide', version: ALLURE_LIBS_VERSION
+
+    // LOGGER
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.26'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-slf4j-impl
+    compile group: 'org.apache.logging.log4j', name: 'log4j-slf4j-impl', version: '2.12.0'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api
+    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.12.0'
+    // https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core
+    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.12.0'
+
+    // secondary dependencies
+    //work around for warning: unknown enum constant Status.STABLE reason: class file for org.apiguardian.api.API$Status not found
+    testCompileOnly('org.apiguardian:apiguardian-api:1.0.0')
+}
+
+jar {
+    manifest {
+        attributes(
+                "Implementation-Title": project.group + '.' + project.name,
+                "Implementation-Version": version,
+//                "Implementation-Vendor": "" todo: fill Vendor
+        )
+    }
+}
+
+test {
+    Properties properties = new Properties()
+    def defPropName = CONFIG_PROPERTY_NAME
+    def propFileName = System.getenv()[TEST_ENVIRONMENT_FLAG]
+    if (propFileName == null) {
+        propFileName = defPropName
+    }
+
+    println propFileName
+    File propertiesFile = new File('src/test/resources/' + propFileName + '.properties')
+    propertiesFile.withInputStream {
+        properties.load(it)
+    }
+    def thread = properties.threadNumber
+    systemProperties = [
+            'junit.jupiter.extensions.autodetection.enabled': 'true',
+            'junit.jupiter.execution.parallel.enabled': 'true',
+            'junit.jupiter.execution.parallel.config.strategy': 'fixed', // available values: fixed, dynamic
+            'junit.jupiter.execution.parallel.mode.default': 'same_thread', // methods
+            'junit.jupiter.execution.parallel.mode.classes.default': 'concurrent',
+            'junit.jupiter.execution.parallel.config.fixed.parallelism': thread,
+            // to get more details about Parallel Execution, follow the link: https://junit.org/junit5/docs/snapshot/user-guide/#writing-tests-parallel-execution
+
+//            'log4j2.contextSelector': 'org.apache.logging.log4j.core.async.AsyncLoggerContextSelector' //todo uncomment
+    ]
+    useJUnitPlatform {
+        includeTags 'testfactory'
+        // excludeTags 'slow', 'ci'
+        includeEngines 'junit-jupiter'
+        // excludeEngines 'junit-vintage'
+        enableAssertions = true
+
+        // includeClassNamePattern '.*Tests'
+        // excludeClassNamePattern '.*Tests'
+        //enableStandardTestTask false
+        //logManager 'org.apache.logging.log4j.jul.LogManager'
+    }
+}
+
+tasks.withType(JavaExec) {
+    if (it.name == 'junitPlatformTest') {
+        doFirst {
+            jvmArgs "-javaagent:${configurations.agent.singleFile}"
+        }
+    }
+}
+
